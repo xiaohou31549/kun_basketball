@@ -1,0 +1,21 @@
+import os
+
+# 调试模式（生产环境设为 False）
+DEBUG = True
+
+# 要关注的球队
+TEAMS = ['掘金', '湖人', '勇士', '快船']
+
+# 基础 URL
+BASE_URL = 'https://www.yoozhibo.net/lanqiu/nba'
+
+# 下载目录
+DOWNLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'video')
+
+# 视频清晰度配置
+PREFERRED_QUALITY = '480p' if DEBUG else '1080p'
+YOU_GET_QUALITY_ARGS = {
+    '1080p': '--format=dash-flv1080',
+    '720p': '--format=dash-flv720',
+    '480p': '--format=dash-flv480'
+}

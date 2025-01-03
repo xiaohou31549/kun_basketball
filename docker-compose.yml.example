@@ -1,0 +1,16 @@
+version: '3'
+
+services:
+  nba-downloader:
+    image: your-dockerhub-username/nba-downloader:latest  # 将替换为你的 Docker Hub 用户名
+    container_name: nba-downloader
+    volumes:
+      - /volume1/video/NBA:/downloads  # 修改为你的群晖视频目录
+      - ./config.py:/app/config.py     # 挂载本地配置文件
+    environment:
+      - TZ=Asia/Shanghai
+    restart: unless-stopped
+    # 使用 cron 来调度，每天凌晨 3 点运行
+    entrypoint: ["crond", "-f"]
+    command: |
+      bash -c 'echo "0 3 * * * python /app/nba_video_downloader.py >> /var/log/cron.log 2>&1" > /etc/cron.d/nba-cron && chmod 0644 /etc/cron.d/nba-cron && crontab /etc/cron.d/nba-cron && crond -f'
