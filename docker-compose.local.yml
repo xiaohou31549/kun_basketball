@@ -1,0 +1,16 @@
+version: '3'
+
+services:
+  nba-downloader:
+    build: .
+    container_name: nba-downloader-test
+    volumes:
+      - ./video:/downloads  # 使用本地的 video 目录
+      - ./nba_downloader/config.py:/app/nba_downloader/config.py  # 挂载配置文件
+    environment:
+      - TZ=Asia/Shanghai
+      - PYTHONUNBUFFERED=1
+      - CHROME_BIN=/usr/bin/chromium-browser
+      - CHROMEDRIVER_PATH=/usr/bin/chromedriver
+    # 测试时直接运行下载器，不使用 cron
+    command: python -m nba_downloader.nba_video_downloader
