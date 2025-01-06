@@ -4,7 +4,7 @@ import os
 DEBUG = False  # 生产环境设置为 False
 
 # NBA teams to track
-TEAMS = ['湖人', '勇士', '独行侠', '掘金']
+TEAMS = ['湖人', '勇士', '独行侠']
 
 # Base URL for NBA videos
 BASE_URL = 'https://www.yoozhibo.net/lanqiu/nba/video-p1.html'

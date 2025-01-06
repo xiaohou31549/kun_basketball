@@ -87,10 +87,11 @@ class NBAVideoDownloader:
     def get_yesterday_dates(self):
         """获取前一天的日期，返回多种格式以便匹配"""
         yesterday = datetime.now() - timedelta(days=1)
-        # 返回多种可能的日期格式，使用 %-m 和 %-d 去掉前导零
+        # 返回多种可能的日期格式
         dates = {
-            'standard': yesterday.strftime('%-m月%-d日'),  # 1月1日
-            'numeric': yesterday.strftime('%m%d')  # 0101
+            'standard': yesterday.strftime('%m月%d日'),  # 01月05日，用于匹配
+            'display': yesterday.strftime('%-m月%-d号'),  # 1月5号，用于显示
+            'numeric': yesterday.strftime('%m%d')  # 0105
         }
         logger.debug(f"Generated yesterday dates: {dates}")
         return dates
@@ -108,36 +109,56 @@ class NBAVideoDownloader:
     def extract_date_from_title(self, title):
         """从标题中提取日期"""
         try:
-            # 移除可能的空格
-            title = title.strip()
-            
-            # 标题格式是 "MM月DD日 NBA常规赛 ..."
-            if not title:
-                return None
-                
-            # 提取日期部分 (在第一个空格之前)
-            date_part = title.split(' ')[0]
-            
-            # 验证日期格式
-            if not ('月' in date_part and '日' in date_part):
-                return None
-                
-            return date_part
-            
+            # 匹配格式：01月05日 或 1月5日
+            date_match = re.search(r'(\d{1,2})月(\d{1,2})日', title)
+            if date_match:
+                month, day = date_match.groups()
+                # 保持带前导零的格式用于匹配
+                return f"{int(month):02d}月{int(day):02d}日"
+            return None
         except Exception as e:
             logger.error(f"Error extracting date from title: {str(e)}")
             return None
 
-    def is_yesterday_match(self, date_text, yesterday_dates):
-        """检查日期是否是昨天的比赛"""
+    def create_match_directory(self, date_text, title):
+        """创建比赛目录"""
+        # 从标题中提取球队信息
+        teams = []
+        for team in TEAMS:
+            if team in title:
+                teams.append(team)
+        
+        if len(teams) >= 2:
+            teams_str = f"{teams[0]}vs{teams[1]}"
+        else:
+            teams_str = title
+            
+        # 创建简洁的目录名: 1月5号灰熊vs勇士
+        formatted_date = self.format_date(date_text)  # 格式化日期，去掉前导零
+        dir_name = f"{formatted_date}{teams_str}"
+        dir_name = re.sub(r'[<>:"/\\|?*]', '', dir_name)  # 移除非法字符
+        return os.path.join(DOWNLOAD_DIR, dir_name)
+
+    def is_yesterday_match(self, date_text):
+        """检查是否是昨天的比赛"""
         if not date_text:
             return False
             
+        yesterday_dates = self.get_yesterday_dates()
         logger.debug(f"Comparing date_text '{date_text}' with yesterday_dates {yesterday_dates}")
-        # 检查所有可能的日期格式
-        is_match = any(date_text == date for date in yesterday_dates.values())
-        logger.debug(f"Date match result: {is_match}")
-        return is_match
+        
+        # 标准化日期格式进行比较
+        try:
+            match = re.match(r'(\d{1,2})月(\d{1,2})日', date_text)
+            if match:
+                month, day = match.groups()
+                normalized_date = f"{int(month):02d}月{int(day):02d}日"
+                return normalized_date == yesterday_dates['standard']
+        except Exception as e:
+            logger.error(f"Error comparing dates: {str(e)}")
+            return False
+            
+        return False
 
     def is_team_match(self, match_title):
         """检查比赛是否包含关注的球队"""
@@ -202,25 +223,6 @@ class NBAVideoDownloader:
         except Exception as e:
             logger.error(f"Error getting video URL from detail page: {str(e)}")
             return None
-
-    def create_match_directory(self, date_text, title):
-        """创建比赛目录"""
-        # 从标题中提取球队信息
-        teams = []
-        for team in TEAMS:
-            if team in title:
-                teams.append(team)
-        
-        if len(teams) >= 2:
-            teams_str = f"{teams[0]}vs{teams[1]}"
-        else:
-            teams_str = title
-            
-        # 创建简洁的目录名: 1月5号灰熊vs勇士
-        formatted_date = self.format_date(date_text)  # 格式化日期，去掉前导零
-        dir_name = f"{formatted_date}{teams_str}"
-        dir_name = re.sub(r'[<>:"/\\|?*]', '', dir_name)  # 移除非法字符
-        return os.path.join(DOWNLOAD_DIR, dir_name)
 
     def convert_quarter_name(self, quarter_text):
         """将中文节数转换为数字"""
@@ -343,7 +345,7 @@ class NBAVideoDownloader:
                         simplified_title = title
                 
                 # 检查是否是昨天的比赛和关注的球队
-                is_yesterday = self.is_yesterday_match(match_date, yesterday_dates)
+                is_yesterday = self.is_yesterday_match(match_date)
                 is_team = self.is_team_match(title)
                 logger.debug(f"Is yesterday match: {is_yesterday}, Is team match: {is_team}")
                 
