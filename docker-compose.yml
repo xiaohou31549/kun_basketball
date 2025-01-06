@@ -2,7 +2,7 @@ version: '3'
 
 services:
   nba-downloader:
-    image: docker.io/toughcoder/kun_basketball:latest  # 使用 GitHub Actions 构建的镜像
+    image: monkeyhurry/kun_basketball:latest  # 简化镜像地址
     container_name: nba-downloader
     volumes:
       - /volume1/video/NBA:/downloads  # 群晖的下载目录
@@ -14,4 +14,5 @@ services:
       - DEBUG=false  # 生产环境设置
     restart: unless-stopped  # 自动重启
     # 使用 cron 格式设置每天凌晨1点运行
-    command: sh -c 'echo "0 1 * * * python -m nba_downloader.nba_video_downloader >> /downloads/nba_downloader.log 2>&1" > /app/crontab && crond -f -l 2'
+    #command: sh -c 'echo "0 1 * * * python -m nba_downloader.nba_video_downloader >> /downloads/nba_downloader.log 2>&1" > /app/crontab && crond -f -l 2'
+    command: python -m nba_downloader.nba_video_downloader

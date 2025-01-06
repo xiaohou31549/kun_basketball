@@ -1,7 +1,7 @@
 import os
 
 # Debug mode flag
-DEBUG = True
+DEBUG = False  # 生产环境设置为 False
 
 # NBA teams to track
 TEAMS = ['湖人', '勇士', '独行侠', '掘金']
@@ -13,7 +13,7 @@ BASE_URL = 'https://www.yoozhibo.net/lanqiu/nba/video-p1.html'
 DAYS_TO_LOOK_BACK = 3 if DEBUG else 1
 
 # Download directories
-NAS_DOWNLOAD_DIR = '/volume1/video/NBA'
+NAS_DOWNLOAD_DIR = '/downloads'  # 对应 docker-compose.yml 中的挂载点
 LOCAL_DOWNLOAD_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'video')
 
 # Get the appropriate download directory based on debug mode
