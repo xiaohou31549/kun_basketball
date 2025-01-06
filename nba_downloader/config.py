@@ -10,7 +10,7 @@ TEAMS = ['湖人', '勇士', '独行侠', '掘金']
 BASE_URL = 'https://www.yoozhibo.net/lanqiu/nba/video-p1.html'
 
 # Days to look back for matches (default to 3 days in debug mode, 1 day in production)
-DAYS_TO_LOOK_BACK = 3 if DEBUG else 1
+DAYS_TO_LOOK_BACK = 1
 
 # Download directories
 NAS_DOWNLOAD_DIR = '/downloads'  # 对应 docker-compose.yml 中的挂载点

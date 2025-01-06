@@ -87,14 +87,23 @@ class NBAVideoDownloader:
     def get_yesterday_dates(self):
         """获取前一天的日期，返回多种格式以便匹配"""
         yesterday = datetime.now() - timedelta(days=1)
-        # 返回多种可能的日期格式
+        # 返回多种可能的日期格式，使用 %-m 和 %-d 去掉前导零
         dates = {
-            'standard': yesterday.strftime('%m月%d日'),  # 01月01日
-            'no_leading_zeros': yesterday.strftime('%-m月%-d日'),  # 1月1日
+            'standard': yesterday.strftime('%-m月%-d日'),  # 1月1日
             'numeric': yesterday.strftime('%m%d')  # 0101
         }
         logger.debug(f"Generated yesterday dates: {dates}")
         return dates
+
+    def format_date(self, date_text):
+        """格式化日期文本，去掉前导零"""
+        # 使用正则表达式匹配日期格式
+        match = re.match(r'(\d{1,2})月(\d{1,2})日', date_text)
+        if match:
+            month, day = match.groups()
+            # 将字符串转为整数去掉前导零，再转回字符串
+            return f"{int(month)}月{int(day)}号"
+        return date_text
 
     def extract_date_from_title(self, title):
         """从标题中提取日期"""
@@ -208,7 +217,8 @@ class NBAVideoDownloader:
             teams_str = title
             
         # 创建简洁的目录名: 1月5号灰熊vs勇士
-        dir_name = f"{date_text}{teams_str}"
+        formatted_date = self.format_date(date_text)  # 格式化日期，去掉前导零
+        dir_name = f"{formatted_date}{teams_str}"
         dir_name = re.sub(r'[<>:"/\\|?*]', '', dir_name)  # 移除非法字符
         return os.path.join(DOWNLOAD_DIR, dir_name)
 
