@@ -33,7 +33,7 @@ class VideoDownloader:
             logger.info(f"Downloading to: {os.path.join(output_dir, filename)}.mp4")
             logger.info(f"Video URL: {video_info['url']}")
             
-            if video_info['type'] not in ['weibo', 'qq']:
+            if video_info['type'] != 'weibo':
                 logger.error(f"Unsupported video type: {video_info['type']}")
                 return False
 

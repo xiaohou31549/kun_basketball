@@ -13,7 +13,7 @@ BASE_URL = 'https://www.yoozhibo.net/lanqiu/nba/video-p1.html'
 DAYS_TO_LOOK_BACK = 3 if DEBUG else 1
 
 # Download directories
-NAS_DOWNLOAD_DIR = '/volume1/video/nba'
+NAS_DOWNLOAD_DIR = '/volume1/video/NBA'
 LOCAL_DOWNLOAD_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'video')
 
 # Get the appropriate download directory based on debug mode

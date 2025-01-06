@@ -22,8 +22,8 @@ except (ImportError, Exception) as e:
     SELENIUM_AVAILABLE = False
     print(f"Selenium not available, falling back to requests mode: {str(e)}")
 
-from .config import TEAMS, BASE_URL, DOWNLOAD_DIR, PREFERRED_QUALITY, DEBUG, YOU_GET_QUALITY_ARGS
-from .video_downloader import VideoDownloader
+from nba_downloader.config import TEAMS, BASE_URL, DOWNLOAD_DIR, PREFERRED_QUALITY, DEBUG, YOU_GET_QUALITY_ARGS
+from nba_downloader.video_downloader import VideoDownloader
 
 # 设置日志
 logging.basicConfig(
@@ -166,7 +166,7 @@ class NBAVideoDownloader:
             soup = BeautifulSoup(content, 'html.parser')
             video_links = []
             
-            # 1. 先查找微博链接
+            # 查找微博链接
             for a in soup.select('#lx li.cd a, #jj li.cd a'):
                 if '微博' in a.text:
                     quarter = None
@@ -186,27 +186,7 @@ class NBAVideoDownloader:
                         'priority': 2 if '国语' in a.text else 1
                     })
             
-            # 2. 如果没有微博链接或者同时查找QQ国语视频
-            for a in soup.select('#lx li.cd a'):
-                if 'QQ' in a.text and '国语' in a.text:
-                    quarter = None
-                    for q in ['第一节', '第二节', '第三节', '第四节']:
-                        if q in a.text:
-                            quarter = q
-                            break
-                    
-                    qq_url = a['href']
-                    logger.info(f"Found QQ video: {qq_url}")
-                    
-                    video_links.append({
-                        'type': 'qq',
-                        'url': qq_url,
-                        'text': a.text,
-                        'quarter': quarter,
-                        'priority': 1
-                    })
-            
-            # 按优先级排序视频链接（微博国语 > 微博普通 > QQ国语）
+            # 按优先级排序视频链接（微博国语 > 微博普通）
             video_links.sort(key=lambda x: (-x['priority'], x['quarter'] or ''))
             return video_links
             
@@ -344,23 +324,36 @@ class NBAVideoDownloader:
 
     def run(self):
         """运行下载器"""
-        logger.info("Starting NBA video downloader")
-        logger.info(f"Base URL: {BASE_URL}")
-        logger.info(f"Download directory: {DOWNLOAD_DIR}")
-        logger.info(f"Teams to track: {TEAMS}")
+        try:
+            logger.info("Starting NBA video downloader")
+            logger.info(f"Base URL: {BASE_URL}")
+            logger.info(f"Download directory: {DOWNLOAD_DIR}")
+            logger.info(f"Teams to track: {TEAMS}")
 
-        # 获取比赛列表
-        matches = self.get_matches()
-        if not matches:
-            logger.info("No matches found for yesterday")
-            return
+            # 获取比赛列表
+            matches = self.get_matches()
+            if not matches:
+                logger.info("No matches found")
+                return
 
-        logger.info(f"Found {len(matches)} matches to download")
+            total_matches = len(matches)
+            successful_downloads = 0
 
-        # 下载每场比赛的视频
-        for match in matches:
-            if not self.process_match(match):
-                logger.error(f"Failed to process match: {match['title']}")
+            for match in matches:
+                if self.process_match(match):
+                    successful_downloads += 1
+
+            # 添加总结日志
+            logger.info("=== 下载任务总结 ===")
+            logger.info(f"今日符合要求的比赛数量: {total_matches}")
+            logger.info(f"成功下载的比赛数量: {successful_downloads}")
+            logger.info(f"下载成功率: {(successful_downloads/total_matches*100):.1f}% 如果成功率较低，请检查日志中的详细错误信息")
+            logger.info("================")
+
+        except Exception as e:
+            logger.error(f"Error running downloader: {str(e)}")
+            if DEBUG:
+                raise
 
 def main():
     """Entry point for the application."""
