@@ -207,10 +207,21 @@ class NBAVideoDownloader:
         else:
             teams_str = title
             
-        # 创建简洁的目录名
-        dir_name = f"{date_text}_{teams_str}"
-        dir_name = re.sub(r'[<>:"/\\|?*]', '_', dir_name)
+        # 创建简洁的目录名: 1月5号灰熊vs勇士
+        dir_name = f"{date_text}{teams_str}"
+        dir_name = re.sub(r'[<>:"/\\|?*]', '', dir_name)  # 移除非法字符
         return os.path.join(DOWNLOAD_DIR, dir_name)
+
+    def convert_quarter_name(self, quarter_text):
+        """将中文节数转换为数字"""
+        quarter_map = {
+            '第一节': '1',
+            '第二节': '2',
+            '第三节': '3',
+            '第四节': '4',
+            '加时': 'OT'
+        }
+        return quarter_map.get(quarter_text, quarter_text)
 
     def process_match(self, match):
         """处理单场比赛"""
@@ -222,16 +233,36 @@ class NBAVideoDownloader:
         # 获取视频链接
         video_links = self.get_video_url(match['url'])
         if not video_links:
-            logger.error(f"Failed to get video URL for match: {match['title']}")
+            logger.error("Failed to get video links")
             return False
-            
+
+        # 提取球队信息用于文件名
+        teams = []
+        for team in TEAMS:
+            if team in match['title']:
+                teams.append(team)
+        
+        base_filename = f"{teams[0]}vs{teams[1]}" if len(teams) >= 2 else match['title']
+        
         # 下载视频
-        return self.video_downloader.download_videos(
-            videos=video_links,
-            output_dir=match_dir,
-            base_filename=match['title'],
-            quality=PREFERRED_QUALITY
-        )
+        success = True
+        for video_info in video_links:
+            if '节' in video_info.get('text', ''):
+                # 将中文节数转换为数字: 灰熊vs勇士_第1节
+                quarter = re.search(r'第[一二三四]节|加时', video_info['text'])
+                if quarter:
+                    quarter_num = self.convert_quarter_name(quarter.group())
+                    filename = f"{base_filename}_第{quarter_num}节"
+                else:
+                    filename = f"{base_filename}_{video_info['text']}"
+            else:
+                filename = base_filename
+
+            if not self.video_downloader.download(video_info, match_dir, filename, PREFERRED_QUALITY):
+                logger.error(f"Failed to download video: {video_info.get('text', '')}")
+                success = False
+
+        return success
 
     def get_matches(self):
         """获取比赛列表"""

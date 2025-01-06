@@ -2,6 +2,7 @@ import os
 import logging
 import subprocess
 import sys
+import time
 from typing import Optional, Dict, Any
 
 logger = logging.getLogger(__name__)
@@ -18,31 +19,19 @@ class VideoDownloader:
         self.you_get_path = os.path.join(os.path.dirname(sys.executable), 'you-get')
 
     def download(self, video_info: Dict[str, Any], output_dir: str, filename: str, quality: str) -> bool:
-        """
-        下载视频
-        :param video_info: 视频信息，包含 url 和 type
-        :param output_dir: 输出目录
-        :param filename: 输出文件名（不含扩展名）
-        :param quality: 视频清晰度
-        :return: 是否下载成功
-        """
         try:
             if not os.path.exists(output_dir):
                 os.makedirs(output_dir)
 
-            logger.info(f"Downloading to: {os.path.join(output_dir, filename)}.mp4")
-            logger.info(f"Video URL: {video_info['url']}")
+            logger.info(f"开始下载: {filename}")
             
             if video_info['type'] != 'weibo':
-                logger.error(f"Unsupported video type: {video_info['type']}")
+                logger.error(f"不支持的视频类型: {video_info['type']}")
                 return False
 
-            logger.info(f"Using you-get from: {self.you_get_path}")
-            
             # 构建下载命令
             cmd = [
                 self.you_get_path,
-                '--debug',
                 '-o', output_dir,
                 '-O', filename
             ]
@@ -54,32 +43,56 @@ class VideoDownloader:
             
             cmd.append(video_info['url'])
             
-            logger.info(f"Running command: {' '.join(cmd)}")
-            
-            # 执行下载
-            result = subprocess.run(
+            # 使用 Popen 来实时获取输出
+            process = subprocess.Popen(
                 cmd,
-                capture_output=True,
-                text=True,
-                check=True
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                universal_newlines=True,
+                bufsize=1
             )
-            
-            logger.info(f"you-get stdout:\n{result.stdout}")
-            if result.stderr:
-                logger.debug(f"you-get stderr:\n{result.stderr}")
-            
-            return True
+
+            last_log_time = 0
+            downloading = False
+
+            while True:
+                output = process.stdout.readline()
+                if output == '' and process.poll() is not None:
+                    break
+                
+                output = output.strip()
+                if output:
+                    current_time = time.time()
+                    
+                    # 检测下载开始
+                    if 'Downloading' in output:
+                        downloading = True
+                        last_log_time = current_time
+                        logger.info(f"{filename} - {output}")
+                        continue
+                    
+                    # 只在下载过程中每15秒输出一次进度
+                    if downloading and current_time - last_log_time >= 15:
+                        # 只输出包含进度信息的行
+                        if '%' in output:
+                            logger.info(f"{filename} - {output}")
+                            last_log_time = current_time
+
+            # 检查下载结果
+            return_code = process.poll()
+            if return_code == 0:
+                logger.info(f"下载完成: {filename}")
+                return True
+            else:
+                logger.error(f"下载失败 {filename}, 错误码: {return_code}")
+                return False
             
         except subprocess.CalledProcessError as e:
-            logger.error(f"Error running you-get: {str(e)}")
-            if e.stdout:
-                logger.error(f"you-get stdout:\n{e.stdout}")
-            if e.stderr:
-                logger.error(f"you-get stderr:\n{e.stderr}")
+            logger.error(f"下载出错: {str(e)}")
             return False
             
         except Exception as e:
-            logger.error(f"Error downloading video: {str(e)}")
+            logger.error(f"下载异常: {str(e)}")
             return False
 
     def download_videos(self, videos: list, output_dir: str, base_filename: str, quality: str) -> bool:
