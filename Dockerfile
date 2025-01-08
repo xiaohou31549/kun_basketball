@@ -27,9 +27,8 @@ RUN apt-get update && apt-get install -y \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# 创建用户和组
-RUN groupadd -g 100 users && \
-    useradd -u 1026 -g 100 -m -s /bin/bash media
+# 创建媒体用户
+RUN useradd -u 1026 -g 100 -m -s /bin/bash media
 
 # 设置 pip 源为清华源
 RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple && \
