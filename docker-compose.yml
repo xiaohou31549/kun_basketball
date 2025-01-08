@@ -12,15 +12,15 @@ services:
       - CHROME_BIN=/usr/bin/chromium-browser
       - CHROMEDRIVER_PATH=/usr/bin/chromedriver
       - DEBUG=false  # 生产环境设置
-    user: "1000:100"  # 使用普通用户权限
+      - PUID=1026    # 群晖的媒体用户ID
+      - PGID=100     # 群晖的users组ID
+    user: "1026:100"  # 使用群晖媒体用户权限运行
     restart: unless-stopped  # 自动重启
     command: |
       bash -c '
       echo "Starting immediate download task..." && \
       cd /app && python -m nba_downloader.nba_video_downloader >> /downloads/nba_downloader.log 2>&1 && \
       echo "Immediate download task completed. Setting up cron job..." && \
-      echo "0 1 * * * cd /app && python -m nba_downloader.nba_video_downloader >> /downloads/nba_downloader.log 2>&1" > /etc/cron.d/nba-downloader && \
-      chmod 0644 /etc/cron.d/nba-downloader && \
-      crontab /etc/cron.d/nba-downloader && \
+      (crontab -l 2>/dev/null || true; echo "0 1 * * * cd /app && python -m nba_downloader.nba_video_downloader >> /downloads/nba_downloader.log 2>&1") | crontab - && \
       echo "Cron job set up. Starting cron daemon..." && \
       cron -f'
