@@ -27,6 +27,10 @@ RUN apt-get update && apt-get install -y \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
+# 创建用户和组
+RUN groupadd -g 100 users && \
+    useradd -u 1026 -g 100 -m -s /bin/bash media
+
 # 设置 pip 源为清华源
 RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple && \
     pip config set install.trusted-host pypi.tuna.tsinghua.edu.cn
@@ -41,11 +45,16 @@ COPY . /app/
 # 安装项目依赖
 RUN pip install -e .
 
-# 创建下载目录
-RUN mkdir -p /downloads
+# 创建下载目录并设置权限
+RUN mkdir -p /downloads && \
+    chown media:users /downloads && \
+    chmod 755 /downloads
 
 # 设置环境变量
 ENV PYTHONUNBUFFERED=1
+
+# 设置工作目录所有权
+RUN chown -R media:users /app
 
 # 启动命令
 CMD ["python", "-m", "nba_downloader.nba_video_downloader"]
