@@ -135,37 +135,9 @@ class NBAVideoDownloader:
             
         # 创建简洁的目录名: 1月5号灰熊vs勇士
         formatted_date = self.format_date(date_text)  # 格式化日期，去掉前导零
-        
-        # 确保所有字符都是合法的 ASCII 或 UTF-8
         dir_name = f"{formatted_date}{teams_str}"
-        try:
-            # 尝试将字符串编码为 ASCII（移除所有非 ASCII 字符）
-            dir_name_ascii = dir_name.encode('ascii', 'ignore').decode('ascii')
-            if dir_name_ascii.strip():  # 如果转换后还有内容
-                dir_name = dir_name_ascii
-            else:
-                # 如果转换后为空，使用 UTF-8 编码
-                dir_name = dir_name.encode('utf-8').decode('utf-8')
-        except UnicodeError:
-            # 如果出现编码错误，使用 UTF-8
-            dir_name = dir_name.encode('utf-8').decode('utf-8')
-            
-        # 移除非法字符
-        dir_name = re.sub(r'[<>:"/\\|?*]', '', dir_name)
-        
-        # 记录最终的目录名
-        logger.debug(f"Created directory name: {dir_name}, encoding: {dir_name.encode()}")
-        
-        full_path = os.path.join(DOWNLOAD_DIR, dir_name)
-        
-        # 确保目录存在
-        if not os.path.exists(full_path):
-            os.makedirs(full_path)
-            # 设置目录权限为 755
-            os.chmod(full_path, 0o755)
-            logger.debug(f"Created directory: {full_path}")
-            
-        return full_path
+        dir_name = re.sub(r'[<>:"/\\|?*]', '', dir_name)  # 移除非法字符
+        return os.path.join(DOWNLOAD_DIR, dir_name)
 
     def is_yesterday_match(self, date_text):
         """检查是否是昨天的比赛"""
@@ -284,12 +256,6 @@ class NBAVideoDownloader:
         
         base_filename = f"{teams[0]}vs{teams[1]}" if len(teams) >= 2 else match['title']
         
-        # 确保球队名称使用正确的编码
-        try:
-            base_filename = base_filename.encode('utf-8').decode('utf-8')
-        except UnicodeError:
-            logger.warning(f"Error encoding team names: {base_filename}")
-        
         # 下载视频
         success = True
         for video_info in video_links:
@@ -304,34 +270,10 @@ class NBAVideoDownloader:
             else:
                 filename = base_filename
 
-            try:
-                # 确保文件名使用正确的编码
-                filename = filename.encode('utf-8').decode('utf-8')
-            except UnicodeError:
-                logger.warning(f"Error encoding filename: {filename}")
-            
-            # 移除非法字符
-            filename = re.sub(r'[<>:"/\\|?*]', '', filename)
-            
-            # 记录文件名编码信息
-            logger.debug(f"Video filename: {filename}, encoding: {filename.encode()}")
-            
-            video_path = os.path.join(match_dir, filename)
-            
-            # 如果文件已存在且大小大于 1MB，跳过下载
-            if os.path.exists(video_path) and os.path.getsize(video_path) > 1024 * 1024:
-                logger.info(f"Video already exists: {video_path}")
-                continue
-            
-            # 下载视频
-            success = self.video_downloader.download(video_info, match_dir, filename, PREFERRED_QUALITY)
-            if success:
-                # 设置文件权限为 644
-                os.chmod(video_path, 0o644)
-                logger.info(f"Successfully downloaded: {video_path}")
-            else:
-                logger.error(f"Failed to download: {video_path}")
-            
+            if not self.video_downloader.download(video_info, match_dir, filename, PREFERRED_QUALITY):
+                logger.error(f"Failed to download video: {video_info.get('text', '')}")
+                success = False
+
         return success
 
     def get_matches(self):
