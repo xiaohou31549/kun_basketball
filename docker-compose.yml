@@ -18,8 +18,8 @@ services:
     command: |
       bash -c '
       echo "Starting immediate download task..." && \
-      su media -c "cd /app && python -m nba_downloader.nba_video_downloader >> /downloads/nba_downloader.log 2>&1" && \
+      su media -c "cd /app && /usr/local/bin/python -m nba_downloader.nba_video_downloader >> /downloads/nba_downloader.log 2>&1" && \
       echo "Immediate download task completed. Setting up cron job..." && \
-      echo "0 1 * * * su media -c \"cd /app && python -m nba_downloader.nba_video_downloader >> /downloads/nba_downloader.log 2>&1\"" | crontab - && \
+      echo "0 1 * * * su media -c \"cd /app && /usr/local/bin/python -m nba_downloader.nba_video_downloader >> /downloads/nba_downloader.log 2>&1\"" | crontab - && \
       echo "Cron job set up. Starting cron daemon..." && \
       cron -f'
