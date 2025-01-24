@@ -8,6 +8,7 @@ import time
 import random
 import re
 from tqdm import tqdm
+import json
 
 try:
     from selenium import webdriver
@@ -22,8 +23,11 @@ except (ImportError, Exception) as e:
     SELENIUM_AVAILABLE = False
     print(f"Selenium not available, falling back to requests mode: {str(e)}")
 
-from nba_downloader.config import TEAMS, BASE_URL, DOWNLOAD_DIR, PREFERRED_QUALITY, DEBUG, YOU_GET_QUALITY_ARGS
-from nba_downloader.video_downloader import VideoDownloader
+from config import TEAMS, BASE_URL, DOWNLOAD_DIR, PREFERRED_QUALITY, DEBUG, YOU_GET_QUALITY_ARGS
+from video_downloader import VideoDownloader
+
+# 飞书 webhook URL
+FEISHU_WEBHOOK_URL = "https://open.feishu.cn/open-apis/bot/v2/hook/453de894-fdba-4a72-aa01-21b8b756d2e1"
 
 # 设置日志
 logging.basicConfig(
@@ -45,6 +49,12 @@ class NBAVideoDownloader:
         self.use_selenium = True
         self.driver = None
         self.video_downloader = VideoDownloader(DOWNLOAD_DIR, YOU_GET_QUALITY_ARGS)
+        self.download_results = {
+            'matches': [],  # 所有符合条件的比赛
+            'success': [],  # 成功下载的比赛
+            'failed': [],   # 下载失败的比赛
+            'errors': {}    # 失败原因
+        }
         self.init_selenium()
 
     def init_selenium(self):
@@ -239,42 +249,117 @@ class NBAVideoDownloader:
         """处理单场比赛"""
         logger.info(f"Processing match: {match['title']}")
         
-        # 创建比赛目录
-        match_dir = self.create_match_directory(match['date'], match['title'])
-        
-        # 获取视频链接
-        video_links = self.get_video_url(match['url'])
-        if not video_links:
-            logger.error("Failed to get video links")
+        try:
+            # 创建比赛目录
+            match_dir = self.create_match_directory(match['date'], match['title'])
+            
+            # 获取视频链接
+            video_links = self.get_video_url(match['url'])
+            if not video_links:
+                error_msg = "未找到视频链接"
+                logger.error(error_msg)
+                self.download_results['failed'].append(match['title'])
+                self.download_results['errors'][match['title']] = error_msg
+                return False
+
+            # 提取球队信息用于文件名
+            teams = []
+            for team in TEAMS:
+                if team in match['title']:
+                    teams.append(team)
+            
+            base_filename = f"{teams[0]}vs{teams[1]}" if len(teams) >= 2 else match['title']
+            
+            # 下载视频
+            success = True
+            for video_info in video_links:
+                if '节' in video_info.get('text', ''):
+                    # 将中文节数转换为数字: 灰熊vs勇士_第1节
+                    quarter = re.search(r'第[一二三四]节|加时', video_info['text'])
+                    if quarter:
+                        quarter_num = self.convert_quarter_name(quarter.group())
+                        filename = f"{base_filename}_第{quarter_num}节"
+                    else:
+                        filename = f"{base_filename}_{video_info['text']}"
+                else:
+                    filename = base_filename
+
+                if not self.video_downloader.download(video_info, match_dir, filename, PREFERRED_QUALITY):
+                    error_msg = f"下载失败: {video_info.get('text', '')}"
+                    logger.error(error_msg)
+                    success = False
+                    if match['title'] not in self.download_results['failed']:
+                        self.download_results['failed'].append(match['title'])
+                        self.download_results['errors'][match['title']] = error_msg
+
+            if success:
+                self.download_results['success'].append(match['title'])
+            return success
+
+        except Exception as e:
+            error_msg = str(e)
+            logger.error(f"处理比赛时发生错误: {error_msg}")
+            self.download_results['failed'].append(match['title'])
+            self.download_results['errors'][match['title']] = error_msg
             return False
 
-        # 提取球队信息用于文件名
-        teams = []
-        for team in TEAMS:
-            if team in match['title']:
-                teams.append(team)
+    def send_feishu_message(self):
+        """发送飞书消息"""
+        # 获取昨天的日期
+        yesterday = (datetime.now() - timedelta(days=1)).strftime('%Y年%m月%d日')
         
-        base_filename = f"{teams[0]}vs{teams[1]}" if len(teams) >= 2 else match['title']
+        # 构建消息内容
+        message = f"🏀 NBA比赛下载报告 ({yesterday})\n\n"
         
-        # 下载视频
-        success = True
-        for video_info in video_links:
-            if '节' in video_info.get('text', ''):
-                # 将中文节数转换为数字: 灰熊vs勇士_第1节
-                quarter = re.search(r'第[一二三四]节|加时', video_info['text'])
-                if quarter:
-                    quarter_num = self.convert_quarter_name(quarter.group())
-                    filename = f"{base_filename}_第{quarter_num}节"
-                else:
-                    filename = f"{base_filename}_{video_info['text']}"
-            else:
-                filename = base_filename
-
-            if not self.video_downloader.download(video_info, match_dir, filename, PREFERRED_QUALITY):
-                logger.error(f"Failed to download video: {video_info.get('text', '')}")
-                success = False
-
-        return success
+        # 添加符合要求的比赛
+        message += "📅 符合下载要求的比赛：\n"
+        if self.download_results['matches']:
+            for match in self.download_results['matches']:
+                message += f"• {match}\n"
+        else:
+            message += "无\n"
+        
+        # 添加成功下载的比赛
+        message += "\n✅ 下载成功：\n"
+        if self.download_results['success']:
+            for match in self.download_results['success']:
+                message += f"• {match}\n"
+        else:
+            message += "无\n"
+        
+        # 添加下载失败的比赛
+        message += "\n❌ 下载失败：\n"
+        if self.download_results['failed']:
+            for match in self.download_results['failed']:
+                reason = self.download_results['errors'].get(match, "未知原因")
+                message += f"• {match}\n  原因：{reason}\n"
+        else:
+            message += "无\n"
+        
+        # 添加统计信息
+        total = len(self.download_results['matches'])
+        success = len(self.download_results['success'])
+        if total > 0:
+            success_rate = (success / total) * 100
+            message += f"\n📊 统计信息：\n"
+            message += f"总场次：{total}\n"
+            message += f"成功：{success}\n"
+            message += f"成功率：{success_rate:.1f}%\n"
+        
+        # 发送消息到飞书
+        try:
+            payload = {
+                "msg_type": "text",
+                "content": {
+                    "text": message
+                }
+            }
+            
+            response = requests.post(FEISHU_WEBHOOK_URL, json=payload)
+            response.raise_for_status()
+            logger.info("成功发送飞书消息")
+        except Exception as e:
+            logger.error(f"发送飞书消息失败: {str(e)}")
 
     def get_matches(self):
         """获取比赛列表"""
@@ -377,8 +462,12 @@ class NBAVideoDownloader:
             matches = self.get_matches()
             if not matches:
                 logger.info("No matches found")
+                self.send_feishu_message()  # 即使没有比赛也发送消息
                 return
 
+            # 记录所有符合条件的比赛
+            self.download_results['matches'] = [match['title'] for match in matches]
+            
             total_matches = len(matches)
             successful_downloads = 0
 
@@ -392,6 +481,9 @@ class NBAVideoDownloader:
             logger.info(f"成功下载的比赛数量: {successful_downloads}")
             logger.info(f"下载成功率: {(successful_downloads/total_matches*100):.1f}% 如果成功率较低，请检查日志中的详细错误信息")
             logger.info("================")
+
+            # 发送飞书消息
+            self.send_feishu_message()
 
         except Exception as e:
             logger.error(f"Error running downloader: {str(e)}")

@@ -14,7 +14,7 @@ DAYS_TO_LOOK_BACK = 1
 
 # Download directories
 NAS_DOWNLOAD_DIR = '/downloads'  # 对应 docker-compose.yml 中的挂载点
-LOCAL_DOWNLOAD_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'video')
+LOCAL_DOWNLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'downloads')
 
 # Get the appropriate download directory based on debug mode
 DOWNLOAD_DIR = LOCAL_DOWNLOAD_DIR if DEBUG else NAS_DOWNLOAD_DIR

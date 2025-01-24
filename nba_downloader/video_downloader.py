@@ -16,7 +16,8 @@ class VideoDownloader:
         """
         self.download_dir = download_dir
         self.quality_config = quality_config
-        self.you_get_path = os.path.join(os.path.dirname(sys.executable), 'you-get')
+        # 使用 python -m you_get 来运行
+        self.you_get_path = sys.executable
 
     def download(self, video_info: Dict[str, Any], output_dir: str, filename: str, quality: str) -> bool:
         try:
@@ -32,6 +33,7 @@ class VideoDownloader:
             # 构建下载命令
             cmd = [
                 self.you_get_path,
+                '-m', 'you_get',
                 '-o', output_dir,
                 '-O', filename
             ]
