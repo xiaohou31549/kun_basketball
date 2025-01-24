@@ -23,8 +23,8 @@ except (ImportError, Exception) as e:
     SELENIUM_AVAILABLE = False
     print(f"Selenium not available, falling back to requests mode: {str(e)}")
 
-from config import TEAMS, BASE_URL, DOWNLOAD_DIR, PREFERRED_QUALITY, DEBUG, YOU_GET_QUALITY_ARGS
-from video_downloader import VideoDownloader
+from nba_downloader.config import TEAMS, BASE_URL, DOWNLOAD_DIR, PREFERRED_QUALITY, DEBUG, YOU_GET_QUALITY_ARGS
+from nba_downloader.video_downloader import VideoDownloader
 
 # 飞书 webhook URL
 FEISHU_WEBHOOK_URL = "https://open.feishu.cn/open-apis/bot/v2/hook/453de894-fdba-4a72-aa01-21b8b756d2e1"
